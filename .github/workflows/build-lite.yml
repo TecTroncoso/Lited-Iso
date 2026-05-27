@@ -4,8 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Release Tag from Iso-Builder (e.g. 22631.3593.PRO.X64.ES)'
-        required: true
+        description: 'Release Tag (e.g. 22631.3593.PRO.X64.ES or "latest" to auto-detect)'
+        default: 'latest'
+        required: false
       image_index:
         description: 'Windows image index (1=Home, 4=Education, 6=Pro, 7=Pro N)'
         default: '6'
@@ -60,12 +61,40 @@ jobs:
           Remove-Item -Path "C:\hostedtoolcache\windows\*" -Recurse -Force -ErrorAction SilentlyContinue
           Remove-Item -Path "C:\ProgramData\Docker" -Recurse -Force -ErrorAction SilentlyContinue
 
+      - name: Determine Release Tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $inputTag = "${{ inputs.release_tag }}"
+          if ([string]::IsNullOrWhiteSpace($inputTag) -or $inputTag -eq "latest") {
+            Write-Host "Fetching latest releases from TecTroncoso/uup-dump-build-windows-iso..."
+            $releases = gh api repos/TecTroncoso/uup-dump-build-windows-iso/releases | ConvertFrom-Json
+            
+            $win11Release = $releases | Where-Object { 
+              $_.name -notmatch "Windows 10" -and 
+              $_.tag_name -notmatch "^1904" 
+            } | Select-Object -First 1
+
+            if ($win11Release) {
+              $selectedTag = $win11Release.tag_name
+              Write-Host "Found latest Windows 11 release: $selectedTag"
+              Add-Content -Path $env:GITHUB_ENV -Value "ACTUAL_RELEASE_TAG=$selectedTag"
+            } else {
+              Write-Error "No Windows 11 releases found in the repository."
+              exit 1
+            }
+          } else {
+            Write-Host "Using provided release tag: $inputTag"
+            Add-Content -Path $env:GITHUB_ENV -Value "ACTUAL_RELEASE_TAG=$inputTag"
+          }
+
       - name: Setup workspace variables
         shell: pwsh
         run: |
-          $isoName = "Lite11-${{ inputs.release_tag }}"
+          $isoName = "Lite11-$env:ACTUAL_RELEASE_TAG"
           Add-Content -Path $env:GITHUB_ENV -Value "ISO_NAME=$isoName"
-          Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_TAG=Lite-${{ inputs.release_tag }}"
+          Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_TAG=Lite-$env:ACTUAL_RELEASE_TAG"
 
       - name: Descargar partes de la ISO original
         env:
@@ -74,8 +103,8 @@ jobs:
         run: |
           mkdir iso-parts
           cd iso-parts
-          Write-Host "Descargando release ${{ inputs.release_tag }} desde TecTroncoso/uup-dump-build-windows-iso"
-          gh release download ${{ inputs.release_tag }} --repo TecTroncoso/uup-dump-build-windows-iso --pattern "*.zip.*"
+          Write-Host "Descargando release $env:ACTUAL_RELEASE_TAG desde TecTroncoso/uup-dump-build-windows-iso"
+          gh release download $env:ACTUAL_RELEASE_TAG --repo TecTroncoso/uup-dump-build-windows-iso --pattern "*.zip.*"
           
           $files = Get-ChildItem -Filter "*.zip.*"
           if ($files.Count -eq 0) {
