@@ -26,6 +26,21 @@ on:
         description: 'Language code (e.g. ES, EN)'
         default: 'ES'
         required: true
+      enable_dotnet35:
+        description: 'Habilitar .NET 3.5 en la ISO'
+        type: boolean
+        default: false
+        required: false
+      remove_winre:
+        description: 'Remover Windows Recovery Environment (WinRE)'
+        type: boolean
+        default: false
+        required: false
+      export_esd:
+        description: 'Exportar imagen final como ESD (Reduce mucho el tamaño)'
+        type: boolean
+        default: true
+        required: false
 
 jobs:
   build-lite:
@@ -115,12 +130,17 @@ jobs:
           Write-Host "ISO Drive: $($env:ISO_DRIVE)"
           Write-Host "Image Index: ${{ inputs.image_index }}"
           
-          # Verificar si el script y autounattend existen
           if (-not (Test-Path "scripts\tiny11maker-headless.ps1")) { Write-Error "tiny11maker-headless.ps1 no encontrado"; exit 1 }
           if (-not (Test-Path "scripts\autounattend.xml")) { Write-Error "autounattend.xml no encontrado"; exit 1 }
 
+          $scriptArgs = @("-ISO", "$env:ISO_DRIVE", "-INDEX", [int]"${{ inputs.image_index }}")
+          
+          if ("${{ inputs.enable_dotnet35 }}" -eq "true") { $scriptArgs += "-EnableDotNet35" }
+          if ("${{ inputs.remove_winre }}" -eq "true") { $scriptArgs += "-RemoveWinRE" }
+          if ("${{ inputs.export_esd }}" -eq "true") { $scriptArgs += "-ExportAsESD" }
+
           $startTime = Get-Date
-          .\scripts\tiny11maker-headless.ps1 -ISO $env:ISO_DRIVE -INDEX [int]"${{ inputs.image_index }}"
+          & .\scripts\tiny11maker-headless.ps1 @scriptArgs
           $buildTime = (Get-Date) - $startTime
           Write-Host "Modificación completada en $($buildTime.TotalMinutes.ToString('F2')) minutos"
 

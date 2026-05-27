@@ -49,7 +49,16 @@ param (
     [string]$SCRATCH,
     
     [Parameter(Mandatory=$false, HelpMessage="Skip cleanup of temporary files")]
-    [switch]$SkipCleanup
+    [switch]$SkipCleanup,
+
+    [Parameter(Mandatory=$false, HelpMessage="Enable .NET 3.5")]
+    [switch]$EnableDotNet35,
+
+    [Parameter(Mandatory=$false, HelpMessage="Remove Windows Recovery Environment (WinRE)")]
+    [switch]$RemoveWinRE,
+
+    [Parameter(Mandatory=$false, HelpMessage="Export final image as ESD instead of WIM")]
+    [switch]$ExportAsESD
 )
 
 #---------[ Error Handling ]---------#
@@ -285,6 +294,53 @@ function Get-ImageMetadata {
             Write-Log "Architecture: $script:architecture"
             break
         }
+    }
+}
+
+function Remove-SystemPackages {
+    Write-Log "Removing unnecessary system packages..."
+    $packagePatterns = @(
+        "Microsoft-Windows-InternetExplorer-Optional-Package~31bf3856ad364e35",
+        "Microsoft-Windows-MediaPlayer-Package~31bf3856ad364e35",
+        "Microsoft-Windows-WordPad-FoD-Package~",
+        "Microsoft-Windows-TabletPCMath-Package~",
+        "Microsoft-Windows-StepsRecorder-Package~",
+        "Microsoft-Windows-Wallpaper-Content-Extended-FoD-Package~31bf3856ad364e35"
+    )
+
+    $allPackages = & dism /image:$scratchDir /Get-Packages /Format:Table
+    $allPackages = $allPackages -split "`n" | Select-Object -Skip 1
+
+    foreach ($packagePattern in $packagePatterns) {
+        $packagesToRemove = $allPackages | Where-Object { $_ -like "$packagePattern*" }
+
+        foreach ($package in $packagesToRemove) {
+            $packageIdentity = ($package -split "\s+")[0]
+            Write-Log "Removing system package: $packageIdentity"
+            & dism /image:$scratchDir /Remove-Package "/PackageName:$packageIdentity" | Out-Null
+        }
+    }
+    Write-Log "System packages removed"
+}
+
+function Enable-DotNet35 {
+    if ($EnableDotNet35) {
+        Write-Log "Enabling .NET Framework 3.5..."
+        & dism /image:$scratchDir /enable-feature /featurename:NetFX3 /All "/source:$tiny11Dir\sources\sxs" | Out-Null
+        Write-Log ".NET Framework 3.5 enabled"
+    }
+}
+
+function Remove-WinRE {
+    if ($RemoveWinRE) {
+        Write-Log "Removing Windows Recovery Environment (WinRE)..."
+        & takeown /f "$scratchDir\Windows\System32\Recovery" /r | Out-Null
+        $adminSID = New-Object System.Security.Principal.SecurityIdentifier("S-1-5-32-544")
+        $adminGroup = $adminSID.Translate([System.Security.Principal.NTAccount])
+        & icacls "$scratchDir\Windows\System32\Recovery" /grant "$($adminGroup.Value):(F)" /T /C | Out-Null
+        Remove-Item -Path "$scratchDir\Windows\System32\Recovery\winre.wim" -Recurse -Force -ErrorAction SilentlyContinue
+        New-Item -Path "$scratchDir\Windows\System32\Recovery\winre.wim" -ItemType File -Force | Out-Null
+        Write-Log "WinRE removed"
     }
 }
 
@@ -653,15 +709,25 @@ function Dismount-AndExport {
     Write-Log "Dismounting install.wim..."
     Dismount-WindowsImage -Path $scratchDir -Save
     
-    Write-Log "Exporting image with maximum compression (this may take 15-20 minutes)..."
-    $tempWim = "$tiny11Dir\sources\install2.wim"
-    & Dism.exe /Export-Image /SourceImageFile:$wimFilePath /SourceIndex:$INDEX `
-        /DestinationImageFile:$tempWim /Compress:recovery | Out-Null
-    
-    Remove-Item -Path $wimFilePath -Force
-    Rename-Item -Path $tempWim -NewName "install.wim"
-    
-    Write-Log "Install.wim export complete"
+    if ($ExportAsESD) {
+        Write-Log "Exporting image as ESD with recovery compression (this may take 15-25 minutes)..."
+        $tempEsd = "$tiny11Dir\sources\install.esd"
+        & Dism.exe /Export-Image /SourceImageFile:$wimFilePath /SourceIndex:$INDEX `
+            /DestinationImageFile:$tempEsd /Compress:recovery | Out-Null
+        
+        Remove-Item -Path $wimFilePath -Force
+        Write-Log "Install.esd export complete"
+    } else {
+        Write-Log "Exporting image with maximum compression (this may take 15-20 minutes)..."
+        $tempWim = "$tiny11Dir\sources\install2.wim"
+        & Dism.exe /Export-Image /SourceImageFile:$wimFilePath /SourceIndex:$INDEX `
+            /DestinationImageFile:$tempWim /Compress:recovery | Out-Null
+        
+        Remove-Item -Path $wimFilePath -Force
+        Rename-Item -Path $tempWim -NewName "install.wim"
+        
+        Write-Log "Install.wim export complete"
+    }
 }
 
 function Process-BootImage {
@@ -778,8 +844,8 @@ function Invoke-Cleanup {
 
 #---------[ Main Execution ]---------#
 try {
-    Write-Log "=== Tiny11 Headless Builder Started ===" "INFO"
-    Write-Log "Author: kelexine (https://github.com/kelexine)"
+    Write-Log "=== Lited-Iso Headless Builder Started ===" "INFO"
+    Write-Log "Author: TecTroncoso (Based on tiny11-automated)"
     Write-Log "Parameters: ISO=$ISO, INDEX=$INDEX, SCRATCH=$ScratchDisk"
     
     Test-Prerequisites
@@ -804,8 +870,11 @@ try {
     Get-ImageMetadata
     
     # Customization phase
+    Remove-SystemPackages
+    Enable-DotNet35
     Remove-BloatwareApps
     Remove-EdgeAndOneDrive
+    Remove-WinRE
     Apply-RegistryTweaks
     Remove-ScheduledTasks
     Remove-NonEssentialServices
