@@ -162,11 +162,14 @@ jobs:
           if (-not (Test-Path "scripts\tiny11maker-headless.ps1")) { Write-Error "tiny11maker-headless.ps1 no encontrado"; exit 1 }
           if (-not (Test-Path "scripts\autounattend.xml")) { Write-Error "autounattend.xml no encontrado"; exit 1 }
 
-          $scriptArgs = @("-ISO", "$env:ISO_DRIVE", "-INDEX", [int]"${{ inputs.image_index }}")
+          $scriptArgs = @{
+            ISO = "$env:ISO_DRIVE"
+            INDEX = [int]"${{ inputs.image_index }}"
+          }
           
-          if ("${{ inputs.enable_dotnet35 }}" -eq "true") { $scriptArgs += "-EnableDotNet35" }
-          if ("${{ inputs.remove_winre }}" -eq "true") { $scriptArgs += "-RemoveWinRE" }
-          if ("${{ inputs.export_esd }}" -eq "true") { $scriptArgs += "-ExportAsESD" }
+          if ("${{ inputs.enable_dotnet35 }}" -eq "true") { $scriptArgs.EnableDotNet35 = $true }
+          if ("${{ inputs.remove_winre }}" -eq "true") { $scriptArgs.RemoveWinRE = $true }
+          if ("${{ inputs.export_esd }}" -eq "true") { $scriptArgs.ExportAsESD = $true }
 
           $startTime = Get-Date
           & .\scripts\tiny11maker-headless.ps1 @scriptArgs
