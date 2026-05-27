@@ -1,0 +1,18 @@
+# Directorios de otros proyectos locales
+/Iso-Builder/
+/tiny11builder/
+/tiny11-automated/
+
+# Entorno virtual y configuraciones locales
+/venv/
+/.vscode/
+abrir_proyecto.bat
+
+# Archivos temporales o de salida de las pruebas locales
+*.iso
+/iso-parts/
+/extracted/
+/output_zip/
+/upload_folder/
+/dist/
+release_notes.md
