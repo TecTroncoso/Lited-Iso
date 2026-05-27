@@ -1,0 +1,261 @@
+name: Build Lite Windows ISO
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release Tag from Iso-Builder (e.g. 22631.3593.PRO.X64.ES)'
+        required: true
+      image_index:
+        description: 'Windows image index (1=Home, 4=Education, 6=Pro, 7=Pro N)'
+        default: '6'
+        type: choice
+        options:
+          - '1'
+          - '4'
+          - '6'
+          - '7'
+        required: true
+      architecture:
+        description: 'Architecture (used for naming)'
+        type: choice
+        options: [x64, arm64]
+        default: x64
+        required: true
+      language:
+        description: 'Language code (e.g. ES, EN)'
+        default: 'ES'
+        required: true
+
+jobs:
+  build-lite:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Liberar espacio en el servidor
+        shell: pwsh
+        run: |
+          Write-Host "Borrando software inútil del servidor para hacer espacio..."
+          Remove-Item -Path "C:\Android" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path "C:\hostedtoolcache\windows\*" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path "C:\ProgramData\Docker" -Recurse -Force -ErrorAction SilentlyContinue
+
+      - name: Setup workspace variables
+        shell: pwsh
+        run: |
+          $isoName = "Lite11-${{ inputs.release_tag }}"
+          Add-Content -Path $env:GITHUB_ENV -Value "ISO_NAME=$isoName"
+          Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_TAG=Lite-${{ inputs.release_tag }}"
+
+      - name: Descargar partes de la ISO original
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          mkdir iso-parts
+          cd iso-parts
+          Write-Host "Descargando release ${{ inputs.release_tag }} desde TecTroncoso/uup-dump-build-windows-iso"
+          gh release download ${{ inputs.release_tag }} --repo TecTroncoso/uup-dump-build-windows-iso --pattern "*.zip.*"
+          
+          $files = Get-ChildItem -Filter "*.zip.*"
+          if ($files.Count -eq 0) {
+            Write-Error "No se encontraron archivos .zip.* en la release especificada."
+            exit 1
+          }
+          Write-Host "Archivos descargados:"
+          $files | Select-Object Name, Length | Format-Table
+
+      - name: Extraer ISO original
+        shell: pwsh
+        run: |
+          cd iso-parts
+          $firstPart = Get-ChildItem -Filter "*.zip.001" | Select-Object -First 1
+          if (-not $firstPart) {
+            Write-Error "No se encontró el archivo .zip.001 inicial."
+            exit 1
+          }
+          Write-Host "Extrayendo $($firstPart.Name) con 7z..."
+          7z x $firstPart.FullName -o"../extracted" -y -bsp1 -bso0
+          
+          $isoFile = Get-ChildItem -Path "../extracted" -Filter "*.ISO" | Select-Object -First 1
+          if (-not $isoFile) {
+            Write-Error "No se encontró el archivo .ISO después de la extracción."
+            exit 1
+          }
+          
+          Move-Item -Path $isoFile.FullName -Destination "../Win11_Source.iso" -Force
+          Write-Host "ISO extraída en ../Win11_Source.iso"
+
+      - name: Montar ISO
+        shell: pwsh
+        run: |
+          $isoPath = Join-Path $PWD "Win11_Source.iso"
+          Write-Host "Montando ISO: $isoPath"
+          $mount = Mount-DiskImage -ImagePath $isoPath -PassThru -StorageType ISO
+          Start-Sleep -Seconds 3
+          $driveLetter = ($mount | Get-Volume).DriveLetter
+          
+          if (-not $driveLetter) {
+            Write-Error "No se pudo montar la ISO o obtener la letra de la unidad."
+            exit 1
+          }
+          Write-Host "ISO montada en la unidad: ${driveLetter}:"
+          Add-Content -Path $env:GITHUB_ENV -Value "ISO_DRIVE=$driveLetter"
+
+      - name: Ejecutar Tiny11Maker (Headless)
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          Write-Host "=== Iniciando Tiny11 Builder ==="
+          Write-Host "ISO Drive: $($env:ISO_DRIVE)"
+          Write-Host "Image Index: ${{ inputs.image_index }}"
+          
+          # Verificar si el script y autounattend existen
+          if (-not (Test-Path "scripts\tiny11maker-headless.ps1")) { Write-Error "tiny11maker-headless.ps1 no encontrado"; exit 1 }
+          if (-not (Test-Path "scripts\autounattend.xml")) { Write-Error "autounattend.xml no encontrado"; exit 1 }
+
+          $startTime = Get-Date
+          .\scripts\tiny11maker-headless.ps1 -ISO $env:ISO_DRIVE -INDEX [int]"${{ inputs.image_index }}"
+          $buildTime = (Get-Date) - $startTime
+          Write-Host "Modificación completada en $($buildTime.TotalMinutes.ToString('F2')) minutos"
+
+      - name: Verificar ISO modificada y preparar archivos
+        shell: pwsh
+        run: |
+          $tempIso = ".\scripts\tiny11.iso"
+          if (-not (Test-Path $tempIso)) {
+            Write-Error "¡$tempIso no fue creada!"
+            exit 1
+          }
+          
+          Move-Item -Path $tempIso -Destination "$($env:ISO_NAME).iso" -Force
+          $sizeGB = [math]::Round((Get-Item "$($env:ISO_NAME).iso").Length / 1GB, 2)
+          Write-Host "$($env:ISO_NAME).iso creada exitosamente: ${sizeGB}GB"
+          
+          # Desmontar y borrar la original para ahorrar espacio
+          Get-DiskImage -ImagePath "Win11_Source.iso" | Dismount-DiskImage -ErrorAction SilentlyContinue
+          Remove-Item "Win11_Source.iso" -Force -ErrorAction SilentlyContinue
+          Remove-Item "iso-parts" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item "extracted" -Recurse -Force -ErrorAction SilentlyContinue
+
+          # Checksums
+          $sha256 = (Get-FileHash -Path "$($env:ISO_NAME).iso" -Algorithm SHA256).Hash
+          $md5 = (Get-FileHash -Path "$($env:ISO_NAME).iso" -Algorithm MD5).Hash
+          Add-Content -Path $env:GITHUB_ENV -Value "ISO_SHA256=$sha256"
+          Add-Content -Path $env:GITHUB_ENV -Value "ISO_MD5=$md5"
+          Add-Content -Path $env:GITHUB_ENV -Value "ISO_SIZE_GB=$sizeGB"
+
+      - name: Dividir ISO en partes .zip (Para GitHub Releases)
+        shell: pwsh
+        run: |
+          mkdir output_zip
+          Write-Host "Dividiendo $($env:ISO_NAME).iso en partes de 1950MB..."
+          7z a -tzip -mx=0 -v1950M -bsp2 "output_zip/$($env:ISO_NAME).zip" "$($env:ISO_NAME).iso"
+          Get-ChildItem "output_zip/$($env:ISO_NAME).zip.*" | Sort-Object Name | ForEach-Object { Write-Host "Creado: $($_.FullName)" }
+
+      - name: Subir a SourceForge
+        shell: pwsh
+        env:
+          SF_SSH_KEY: ${{ secrets.SF_SSH_KEY }}
+          SF_USERNAME: ${{ secrets.SF_USERNAME }}
+          SF_PROJECT: ${{ secrets.SF_PROJECT }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:SF_SSH_KEY) -or [string]::IsNullOrWhiteSpace($env:SF_USERNAME)) {
+            Write-Host "Credenciales de SourceForge no configuradas. Se omitirá la subida a SourceForge."
+            exit 0
+          }
+          
+          $sfProject = $env:SF_PROJECT
+          if ([string]::IsNullOrWhiteSpace($sfProject)) { $sfProject = "lite-iso" }
+          
+          $sshDir = "$env:USERPROFILE\.ssh"
+          if (!(Test-Path $sshDir)) { New-Item -ItemType Directory -Force -Path $sshDir | Out-Null }
+          $keyPath = "$sshDir\sf_key"
+          
+          try {
+            $keyBytes = [System.Convert]::FromBase64String($env:SF_SSH_KEY)
+            [System.IO.File]::WriteAllBytes($keyPath, $keyBytes)
+          } catch {
+            Write-Error "Fallo al decodificar SF_SSH_KEY. ¿Está codificado en Base64?"
+            exit 1
+          }
+          
+          icacls $keyPath /c /t /inheritance:d
+          icacls $keyPath /c /t /grant "${env:USERNAME}:F"
+          icacls $keyPath /c /t /remove Administrator "Authenticated Users" BUILTIN\Administrators BUILTIN\Users
+          ssh-keyscan -t rsa,ecdsa,ed25519 frs.sourceforge.net | Out-File -FilePath "$sshDir\known_hosts" -Encoding ascii
+          
+          mkdir upload_folder
+          Copy-Item "$($env:ISO_NAME).iso" upload_folder\
+          
+          $remoteRoot = "$env:SF_USERNAME@frs.sourceforge.net:/home/frs/project/$sfProject/"
+          Write-Host "Subiendo archivo a SourceForge..."
+          scp -i $keyPath -r -o StrictHostKeyChecking=no upload_folder $remoteRoot
+          
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Subida por SCP fallida"
+            exit 1
+          }
+          
+          Write-Host "¡Subida exitosa a SourceForge!"
+          $downloadUrl = "https://sourceforge.net/projects/$sfProject/files/upload_folder/$($env:ISO_NAME).iso/download"
+          Add-Content -Path $env:GITHUB_ENV -Value "SF_DOWNLOAD_URL=$downloadUrl"
+          Remove-Item $keyPath -Force -ErrorAction SilentlyContinue
+
+      - name: Generar changelog
+        shell: pwsh
+        run: |
+          $changelog = @"
+          ## 🚀 Windows 11 Lite - $($env:RELEASE_TAG)
+
+          **Construcción automatizada a partir de Iso-Builder**
+
+          ### 💿 Detalles de Imagen
+          | Propiedad | Valor |
+          |----------|-------|
+          | **Archivo** | $($env:ISO_NAME).iso |
+          | **Tamaño** | $($env:ISO_SIZE_GB)GB |
+          | **Arquitectura** | ${{ inputs.architecture }} |
+          | **Índice (Edición)** | ${{ inputs.image_index }} |
+          | **Idioma** | ${{ inputs.language }} |
+
+          ### 📥 Descarga
+          ${{ env.SF_DOWNLOAD_URL != '' && format('**SourceForge:** [{0}]({1})', env.ISO_NAME, env.SF_DOWNLOAD_URL) || '**Nota:** Descarga los archivos .zip divididos directamente de esta release.' }}
+
+          ### 🔒 Checksums
+          **SHA256:**
+          \`\`\`
+          $($env:ISO_SHA256)
+          \`\`\`
+          **MD5:**
+          \`\`\`
+          $($env:ISO_MD5)
+          \`\`\`
+
+          ### ❌ Eliminado
+          - Bloatware general, Clipchamp, Edge, OneDrive, Xbox
+          - Telemetría de Windows y tracking
+
+          ### ✅ Añadido / Modificado
+          - Bypass de TPM 2.0 y Secure Boot
+          - Permite Cuenta Local por defecto
+          - Optimizado para ocupar menos espacio y RAM
+          "@
+          $changelog | Out-File -FilePath release_notes.md -Encoding utf8
+
+      - name: Crear Release en GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.ISO_NAME }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            output_zip/*.zip.*
