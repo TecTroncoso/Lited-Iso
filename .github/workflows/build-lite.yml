@@ -37,6 +37,16 @@ on:
         type: boolean
         default: false
         required: false
+      remove_defender:
+        description: '[PELIGROSO] Remover Windows Defender'
+        type: boolean
+        default: false
+        required: false
+      disable_windows_update:
+        description: '[PELIGROSO] Deshabilitar Windows Update de forma permanente'
+        type: boolean
+        default: false
+        required: false
       export_esd:
         description: 'Exportar imagen final como ESD (Reduce mucho el tamaño)'
         type: boolean
@@ -169,6 +179,8 @@ jobs:
           
           if ("${{ inputs.enable_dotnet35 }}" -eq "true") { $scriptArgs.EnableDotNet35 = $true }
           if ("${{ inputs.remove_winre }}" -eq "true") { $scriptArgs.RemoveWinRE = $true }
+          if ("${{ inputs.remove_defender }}" -eq "true") { $scriptArgs.RemoveDefender = $true }
+          if ("${{ inputs.disable_windows_update }}" -eq "true") { $scriptArgs.DisableWindowsUpdate = $true }
           if ("${{ inputs.export_esd }}" -eq "true") { $scriptArgs.ExportAsESD = $true }
 
           $startTime = Get-Date

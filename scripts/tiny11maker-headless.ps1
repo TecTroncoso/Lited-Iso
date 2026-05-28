@@ -57,6 +57,12 @@ param (
     [Parameter(Mandatory=$false, HelpMessage="Remove Windows Recovery Environment (WinRE)")]
     [switch]$RemoveWinRE,
 
+    [Parameter(Mandatory=$false, HelpMessage="Remove Windows Defender")]
+    [switch]$RemoveDefender,
+
+    [Parameter(Mandatory=$false, HelpMessage="Disable Windows Update permanently")]
+    [switch]$DisableWindowsUpdate,
+
     [Parameter(Mandatory=$false, HelpMessage="Export final image as ESD instead of WIM")]
     [switch]$ExportAsESD
 )
@@ -308,6 +314,10 @@ function Remove-SystemPackages {
         "Microsoft-Windows-Wallpaper-Content-Extended-FoD-Package~31bf3856ad364e35"
     )
 
+    if ($RemoveDefender) {
+        $packagePatterns += "Windows-Defender-Client-Package~31bf3856ad364e35~"
+    }
+
     $allPackages = & dism /image:$scratchDir /Get-Packages /Format:Table
     $allPackages = $allPackages -split "`n" | Select-Object -Skip 1
 
@@ -525,6 +535,30 @@ function Apply-RegistryTweaks {
     Set-RegistryValue 'HKLM\zSYSTEM\Setup\LabConfig' 'BypassTPMCheck' 'REG_DWORD' '1'
     Set-RegistryValue 'HKLM\zSYSTEM\Setup\MoSetup' 'AllowUpgradesWithUnsupportedTPMOrCPU' 'REG_DWORD' '1'
     
+    # Defender Removal Hooks
+    if ($RemoveDefender) {
+        Write-Log "Applying registry blocks for Windows Defender..."
+        foreach ($svc in @("WinDefend", "WdNisSvc", "WdNisDrv", "WdFilter", "Sense")) {
+            Set-RegistryValue "HKLM\zSYSTEM\ControlSet001\Services\$svc" 'Start' 'REG_DWORD' '4'
+        }
+        Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer' 'SettingsPageVisibility' 'REG_SZ' 'hide:virus;windowsupdate'
+    }
+
+    # Windows Update Disabling
+    if ($DisableWindowsUpdate) {
+        Write-Log "Applying aggressive blocks for Windows Update..."
+        Set-RegistryValue "HKLM\zSOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce" 'StopWUPostOOBE1' 'REG_SZ' 'net stop wuauserv'
+        Set-RegistryValue "HKLM\zSOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce" 'StopWUPostOOBE3' 'REG_SZ' 'sc config wuauserv start= disabled'
+        Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\WindowsUpdate' 'DoNotConnectToWindowsUpdateInternetLocations' 'REG_DWORD' '1'
+        Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\WindowsUpdate' 'WUServer' 'REG_SZ' 'localhost'
+        Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\WindowsUpdate' 'WUStatusServer' 'REG_SZ' 'localhost'
+        Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' 'UseWUServer' 'REG_DWORD' '1'
+        Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' 'NoAutoUpdate' 'REG_DWORD' '1'
+        Set-RegistryValue 'HKLM\zSYSTEM\ControlSet001\Services\wuauserv' 'Start' 'REG_DWORD' '4'
+        Remove-RegistryValue 'HKLM\zSYSTEM\ControlSet001\Services\WaaSMedicSVC'
+        Remove-RegistryValue 'HKLM\zSYSTEM\ControlSet001\Services\UsoSvc'
+    }
+
     # Disable sponsored apps
     Set-RegistryValue 'HKLM\zNTUSER\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'OemPreInstalledAppsEnabled' 'REG_DWORD' '0'
     Set-RegistryValue 'HKLM\zNTUSER\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'PreInstalledAppsEnabled' 'REG_DWORD' '0'
