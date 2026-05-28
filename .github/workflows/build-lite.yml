@@ -7,6 +7,14 @@ on:
         description: 'Release Tag (e.g. 22631.3593.PRO.X64.ES or "latest" to auto-detect)'
         default: 'latest'
         required: false
+      build_type:
+        description: 'Build Type (Core = Limpieza extrema, Lite = Segura)'
+        default: 'Core'
+        type: choice
+        options:
+          - 'Core'
+          - 'Lite'
+        required: true
       image_index:
         description: 'Windows image index (1=Home, 4=Education, 6=Pro, 7=Pro N)'
         default: '6'
@@ -102,9 +110,10 @@ jobs:
       - name: Setup workspace variables
         shell: pwsh
         run: |
-          $isoName = "Lite11-$env:ACTUAL_RELEASE_TAG"
+          $buildType = "${{ inputs.build_type }}"
+          $isoName = "${buildType}11-$env:ACTUAL_RELEASE_TAG"
           Add-Content -Path $env:GITHUB_ENV -Value "ISO_NAME=$isoName"
-          Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_TAG=Lite-$env:ACTUAL_RELEASE_TAG"
+          Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_TAG=${buildType}-$env:ACTUAL_RELEASE_TAG"
 
       - name: Descargar partes de la ISO original
         env:
@@ -182,6 +191,7 @@ jobs:
           if ("${{ inputs.remove_defender }}" -eq "true") { $scriptArgs.RemoveDefender = $true }
           if ("${{ inputs.disable_windows_update }}" -eq "true") { $scriptArgs.DisableWindowsUpdate = $true }
           if ("${{ inputs.export_esd }}" -eq "true") { $scriptArgs.ExportAsESD = $true }
+          if ("${{ inputs.build_type }}" -eq "Core") { $scriptArgs.ExtremeWinSxSTrim = $true }
 
           $startTime = Get-Date
           & .\scripts\tiny11maker-headless.ps1 @scriptArgs

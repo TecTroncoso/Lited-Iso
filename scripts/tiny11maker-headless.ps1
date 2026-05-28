@@ -63,6 +63,9 @@ param (
     [Parameter(Mandatory=$false, HelpMessage="Disable Windows Update permanently")]
     [switch]$DisableWindowsUpdate,
 
+    [Parameter(Mandatory=$false, HelpMessage="Perform extreme WinSxS trimming (Core Mode)")]
+    [switch]$ExtremeWinSxSTrim,
+
     [Parameter(Mandatory=$false, HelpMessage="Export final image as ESD instead of WIM")]
     [switch]$ExportAsESD
 )
@@ -670,9 +673,53 @@ function Apply-RegistryTweaks {
     Set-RegistryValue 'HKLM\zSOFTWARE\Classes\DesktopBackground\Shell\Tiny11Info' 'MUIVerb' 'REG_SZ' 'Tiny11 Automated Info'
     Set-RegistryValue 'HKLM\zSOFTWARE\Classes\DesktopBackground\Shell\Tiny11Info' 'Icon' 'REG_SZ' 'shell32.dll,22'
     Set-RegistryValue 'HKLM\zSOFTWARE\Classes\DesktopBackground\Shell\Tiny11Info' 'Position' 'REG_SZ' 'Bottom'
-    Set-RegistryValue 'HKLM\zSOFTWARE\Classes\DesktopBackground\Shell\Tiny11Info\command' '' 'REG_SZ' 'explorer.exe "https://github.com/kelexine/tiny11-automated"'
+            Set-RegistryValue 'HKLM\zSOFTWARE\Classes\DesktopBackground\Shell\Tiny11Info\command' '' 'REG_SZ' 'explorer.exe "https://github.com/kelexine/tiny11-automated"'
 
     Write-Log "Registry tweaks applied"
+}
+
+function Optimize-WinSxS {
+    if (-not $ExtremeWinSxSTrim) { return }
+    Write-Log "PERFORMING EXTREME WINSXS TRIM (Tiny11 Core Mode)..." "WARN"
+    
+    $destDir = "$scratchDir\Windows\WinSxS_edit"
+    New-Item -Path $destDir -ItemType Directory | Out-Null
+    
+    $dirsToCopy = @("Catalogs","FileMaps","Fusion","InstallTemp","Manifests","SettingsManifests","Temp")
+    
+    if ($script:architecture -eq "amd64") {
+        $dirsToCopy += @(
+            "x86_microsoft.windows.*_6595b64144ccf1df_*",
+            "x86_microsoft-windows-s..*_31bf3856ad364e35_*",
+            "x86_microsoft-windows-servicingstack*",
+            "amd64_microsoft.vc*crt_1fc8b3b9a1e18e3b_*",
+            "amd64_microsoft.windows.*_6595b64144ccf1df_*",
+            "amd64_microsoft-windows-s..*_31bf3856ad364e35_*",
+            "amd64_microsoft-windows-servicingstack*"
+        )
+    } elseif ($script:architecture -eq "arm64") {
+        $dirsToCopy += @(
+            "arm64_microsoft-windows-servicingstack*",
+            "x86_microsoft.vc*crt_1fc8b3b9a1e18e3b_*",
+            "x86_microsoft.windows.*_6595b64144ccf1df_*",
+            "arm_microsoft.windows.*_6595b64144ccf1df_*",
+            "arm64_microsoft.vc*crt_1fc8b3b9a1e18e3b_*",
+            "arm64_microsoft.windows.*_6595b64144ccf1df_*"
+        )
+    }
+
+    foreach ($dirPattern in $dirsToCopy) {
+        Get-ChildItem -Path "$scratchDir\Windows\WinSxS" -Filter $dirPattern -Directory | ForEach-Object {
+            Copy-Item -Path $_.FullName -Destination "$destDir\$($_.Name)" -Recurse -Force
+        }
+    }
+
+    Write-Log "Deleting original WinSxS folder..."
+    & takeown /f "$scratchDir\Windows\WinSxS" /r /a | Out-Null
+    & icacls "$scratchDir\Windows\WinSxS" /grant "Administrators:(F)" /T /C | Out-Null
+    Remove-Item -Path "$scratchDir\Windows\WinSxS" -Recurse -Force -ErrorAction SilentlyContinue
+    Rename-Item -Path $destDir -NewName "WinSxS"
+    Write-Log "WinSxS Trim Complete"
 }
 
 function Remove-ScheduledTasks {
@@ -910,6 +957,9 @@ try {
     Remove-EdgeAndOneDrive
     Remove-WinRE
     Apply-RegistryTweaks
+    
+    Optimize-WinSxS
+    
     Remove-ScheduledTasks
     Remove-NonEssentialServices
     Unload-RegistryHives
