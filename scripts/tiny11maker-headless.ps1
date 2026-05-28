@@ -694,6 +694,125 @@ function Apply-RegistryTweaks {
     Set-RegistryValue 'HKLM\zNTUSER\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize' 'AppsUseLightTheme' 'REG_DWORD' '0'
     Set-RegistryValue 'HKLM\zNTUSER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' 'EnableTransparency' 'REG_DWORD' '0'
     Set-RegistryValue 'HKLM\zNTUSER\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer' 'ShowRecommendations' 'REG_DWORD' '0'
+    # --- Diagnostic Logging & Tracing ---
+    Write-Log "Disabling unnecessary logging and diagnostics..."
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Cryptography\CatalogDB' 'EnablePerformanceCounters' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows Media Foundation\Platform' 'CallStackTracingEnabled' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\Configuration' 'AdapterLoggingEnabled' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows NT\CurrentVersion\SecEdit' 'PolicyDebugLevel' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows' 'GDIEnableReferenceStackTraces' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows' 'USERPostMortemLogging' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon' 'NoDebugThread' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon' 'RsopLogging' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSYSTEM\ControlSet001\Control\Lsa\Tracing' 'TracingDisabled' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSYSTEM\ControlSet001\Control\Wdf' 'WdfGlobalLogsDisabled' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSYSTEM\ControlSet001\Control\Wdf' 'WdfGlobalSleepStudyDisabled' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSYSTEM\ControlSet001\Control\Diagnostics\Performance' 'DisableDiagnosticTracing' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer' 'NoLowDiskSpaceChecks' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\Explorer' 'DisableThumbsDBOnNetworkFolders' 'REG_DWORD' '1'
+
+    # --- Input Optimizations ---
+    Write-Log "Applying input optimizations..."
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Input' 'IsInputAppPreloadEnabled' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Input\Settings' 'DisablePersonalizationGTKM' 'REG_DWORD' '1'
+
+    # --- Network Optimizations ---
+    Write-Log "Applying network optimizations..."
+    Set-RegistryValue 'HKLM\zSYSTEM\ControlSet001\Services\Dnscache\Parameters' 'EnableNetbios' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\WinHttp' 'DisableWpad' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows NT\DNSClient' 'MaxNegativeCacheTtl' 'REG_DWORD' '5'
+    Set-RegistryValue 'HKLM\zSYSTEM\ControlSet001\Services\BFE\Parameters\Policy\Options' 'CollectNetEvents' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSYSTEM\ControlSet001\Services\Dhcp' 'PdcActivationDisabled' 'REG_DWORD' '1'
+
+    # --- Graphics Driver Optimizations ---
+    Write-Log "Applying graphics driver optimizations..."
+    Set-RegistryValue 'HKLM\zSYSTEM\ControlSet001\Control\GraphicsDrivers' 'HwSchMode' 'REG_DWORD' '2'
+    Set-RegistryValue 'HKLM\zSYSTEM\ControlSet001\Control\GraphicsDrivers' 'MiracastForceDisable' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSYSTEM\ControlSet001\Control\GraphicsDrivers' 'TdrDelay' 'REG_DWORD' '12'
+
+    # --- Deep Telemetry & WER Blocking ---
+    Write-Log "Applying deep telemetry and WER blocking..."
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\CloudContent' 'DisableSoftLanding' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\CloudContent' 'DisableWindowsSpotlightFeatures' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\CloudContent' 'DisableCloudOptimizedContent' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\CloudContent' 'DisableWindowsConsumerFeatures' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\CloudContent' 'DisableTailoredExperiencesWithDiagnosticData' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo' 'DisabledByGroupPolicy' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\DataCollection' 'AllowTelemetry' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\DataCollection' 'DisableOneSettingsDownloads' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\DataCollection' 'AllowCommercialDataPipeline' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\DataCollection' 'MicrosoftEdgeDataOptIn' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection' 'AllowTelemetry' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection' 'MaxTelemetryAllowed' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting' 'Disabled' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting' 'LoggingDisabled' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting' 'DisableArchive' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows\Windows Error Reporting' 'Disabled' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows\Windows Error Reporting' 'LoggingDisabled' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\InputPersonalization' 'AllowInputPersonalization' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\Maps' 'AutoDownloadAndUpdateMapData' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Input\TIPC' 'Enabled' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Dsh' 'AllowNewsAndInterests' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\System' 'EnableActivityFeed' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\System' 'PublishUserActivities' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\System' 'UploadUserActivities' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\FindMyDevice' 'AllowFindMyDevice' 'REG_DWORD' '0'
+
+    # --- Cloud Sync Disabling ---
+    Write-Log "Disabling cloud sync..."
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\SettingSync' 'DisableSettingSync' 'REG_DWORD' '2'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\SettingSync' 'DisableSettingSyncUserOverride' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\SettingSync' 'DisableCredentialsSettingSync' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\SettingSync' 'DisablePersonalizationSettingSync' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\System' 'AllowCrossDeviceClipboard' 'REG_DWORD' '0'
+
+    # --- CEIP (Customer Experience Improvement Program) ---
+    Write-Log "Disabling CEIP..."
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows\CurrentVersion\PushNotifications' 'NoCloudApplicationNotification' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\SQMClient\Windows' 'CEIPEnable' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\SQMClient\Windows' 'CEIPEnable' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\FTH' 'Enabled' 'REG_DWORD' '0'
+
+    # --- MPO (Multiplane Overlay) ---
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows\Dwm' 'OverlayTestMode' 'REG_DWORD' '5'
+
+    # --- Bloatware Auto-Install Blocking ---
+    Write-Log "Blocking bloatware auto-install..."
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows\CurrentVersion\Communications' 'ConfigureChatAutoInstall' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zNTUSER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'SilentInstalledAppsEnabled' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zNTUSER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'OemPreInstalledAppsEnabled' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zNTUSER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'PreInstalledAppsEnabled' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zNTUSER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'ContentDeliveryAllowed' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zNTUSER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'FeatureManagementEnabled' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zNTUSER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'SoftLandingEnabled' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zNTUSER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'SubscribedContent-338388Enabled' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zNTUSER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'SubscribedContent-338389Enabled' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zNTUSER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager' 'SubscribedContent-353698Enabled' 'REG_DWORD' '0'
+
+    # --- Windows Search & Cortana ---
+    Write-Log "Optimizing Windows Search..."
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\Windows Search' 'AllowCortana' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\Windows Search' 'AllowCloudSearch' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\Windows Search' 'AllowSearchToUseLocation' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\Windows Search' 'DisableRemovableDriveIndexing' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Policies\Microsoft\Windows\Windows Search' 'PreventIndexOnBattery' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows\CurrentVersion\Search' 'CortanaEnabled' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zNTUSER\SOFTWARE\Microsoft\Windows\CurrentVersion\Search' 'BingSearchEnabled' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zNTUSER\SOFTWARE\Microsoft\Windows\CurrentVersion\Search' 'CortanaEnabled' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zNTUSER\SOFTWARE\Microsoft\Windows\CurrentVersion\SearchSettings' 'IsMSACloudSearchEnabled' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zNTUSER\SOFTWARE\Microsoft\Windows\CurrentVersion\SearchSettings' 'IsAADCloudSearchEnabled' 'REG_DWORD' '0'
+
+    # --- DWM Visual Optimizations ---
+    Write-Log "Applying DWM visual optimizations..."
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows\Dwm' 'DisableProjectedShadows' 'REG_DWORD' '1'
+    Set-RegistryValue 'HKLM\zSOFTWARE\Microsoft\Windows\Dwm' 'MousewheelAnimationDurationMs' 'REG_DWORD' '0'
+    Set-RegistryValue 'HKLM\zNTUSER\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced' 'DisablePreviewDesktop' 'REG_DWORD' '1'
+
+    # --- Accessibility / Sticky Keys ---
+    Write-Log "Optimizing accessibility defaults..."
+    Set-RegistryValue 'HKLM\zNTUSER\Control Panel\Accessibility\StickyKeys' 'Flags' 'REG_SZ' '2'
+    Set-RegistryValue 'HKLM\zNTUSER\Control Panel\Accessibility\Keyboard Response' 'Flags' 'REG_SZ' '2'
+    Set-RegistryValue 'HKLM\zNTUSER\Control Panel\Accessibility\ToggleKeys' 'Flags' 'REG_SZ' '34'
     # ------------------------------------
 
     Write-Log "Registry tweaks applied"
