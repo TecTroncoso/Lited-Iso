@@ -189,8 +189,14 @@ jobs:
           $sizeGB = [math]::Round((Get-Item "$($env:ISO_NAME).iso").Length / 1GB, 2)
           Write-Host "$($env:ISO_NAME).iso creada exitosamente: ${sizeGB}GB"
           
-          # Desmontar y borrar la original para ahorrar espacio
-          Get-DiskImage -ImagePath "Win11_Source.iso" | Dismount-DiskImage -ErrorAction SilentlyContinue
+          # Desmontar imagen fuente original para limpiar memoria (Error Ignorado si ya se desmontó)
+          $isoPath = "$env:GITHUB_WORKSPACE\Win11_Source.iso"
+          if (Test-Path $isoPath) {
+              $mountedImage = Get-DiskImage -ImagePath $isoPath -ErrorAction SilentlyContinue
+              if ($mountedImage -and $mountedImage.Attached) {
+                  Dismount-DiskImage -ImagePath $isoPath -ErrorAction SilentlyContinue
+              }
+          }
           Remove-Item "Win11_Source.iso" -Force -ErrorAction SilentlyContinue
           Remove-Item "iso-parts" -Recurse -Force -ErrorAction SilentlyContinue
           Remove-Item "extracted" -Recurse -Force -ErrorAction SilentlyContinue
